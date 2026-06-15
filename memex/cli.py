@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""
+memex CLI — wire memex into Claude Code and browse memories from the terminal.
+
+Usage:
+    memex install              # global (~/.claude.json)
+    memex install --local      # this project only (.claude.json)
+    memex remove               # remove from config
+    memex list [--tag TAG]     # show recent entries for this project
+    memex search QUERY         # search entries for this project
+    memex version              # print version
+"""
+
+import argparse
+import json
+import os
+import re
+import sqlite3
+import sys
+from pathlib import Path
+
+from memex import __version__
+
+GLOBAL_CONFIG = Path.home() / ".claude.json"
+LOCAL_CONFIG = Path.cwd() / ".claude.json"
+
+CLAUDE_MD_SNIPPET = """
+## memex: Session Memory
+
+At the **start of every session**, call `mem_load` with a brief hint about
+what you're working on. This gives you context from past sessions so you
+don't rediscover things you already know.
+
+```
+mem_load(hint="<what you're about to work on>", files=["<relevant files>"])
+```
+
+During a session, call `mem_save` whenever you:
+- Finish a meaningful task
+- Make an architectural or design decision
+- Discover something surprising or easy to get wrong
+
+```
+mem_save(
+    task="One-sentence summary of what was done",
+    files=["list", "of", "files", "touched"],
+    decisions=["Any design decisions made"],
+    warnings=["Anything surprising or easy to get wrong"],
+    tags=["short", "labels"],
+    notes="Any extra freeform context"
+)
+```
+
+Other tools:
+- `mem_search(query)` — find past work on a specific topic
+- `mem_list()` — see all stored entries
+- `mem_delete(id)` — remove stale entries
+
+Memory is stored locally in ~/.memex/ as SQLite — no LLMs, no network.
+""".strip()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _load_json(path: Path) -> dict:
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError:
+            print(f"  ⚠ Could not parse {path} — treating as empty")
+    return {}
+
+
+def _save_json(path: Path, data: dict) -> None:
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def _db_path() -> Path:
+    db_dir = Path(os.environ.get("MEMEX_DIR", Path.home() / ".memex"))
+    if os.environ.get("MEMEX_GLOBAL", "0") == "1":
+        return db_dir / "global.db"
+    cwd = os.environ.get("MEMEX_PROJECT", os.getcwd())
+    safe = re.sub(r"[^a-zA-Z0-9_\-]", "_", cwd).strip("_")[:120]
+    return db_dir / f"{safe}.db"
+
+
+def _format_row(row: dict) -> str:
+    lines = [f"#{row['id']} — {row['timestamp'][:16]}  {row['task']}"]
+    for field, label in (("files", "Files"), ("decisions", "Decision"), ("warnings", "Warning")):
+        try:
+            items = json.loads(row[field])
+        except (json.JSONDecodeError, TypeError):
+            items = []
+        for item in items:
+            lines.append(f"  {label:<9}: {item}")
+    if row.get("raw"):
+        lines.append(f"  Notes    : {row['raw']}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+def install(local: bool = False) -> None:
+    config_path = LOCAL_CONFIG if local else GLOBAL_CONFIG
+    scope = "local project" if local else "global"
+    print(f"Installing memex ({scope})...")
+
+    config = _load_json(config_path)
+    config.setdefault("mcpServers", {})
+
+    config["mcpServers"]["memex"] = {
+        "type": "stdio",
+        "command": sys.executable,
+        "args": ["-m", "memex.server"],
+    }
+
+    _save_json(config_path, config)
+    print(f"  ✓ MCP entry written: {config_path}")
+
+    claude_md = Path.cwd() / "CLAUDE.md"
+    if claude_md.exists():
+        existing = claude_md.read_text()
+        if "memex" in existing:
+            print("  ✓ CLAUDE.md already has memex section — skipped")
+        else:
+            claude_md.write_text(existing.rstrip() + "\n\n" + CLAUDE_MD_SNIPPET + "\n")
+            print("  ✓ Appended memex section to CLAUDE.md")
+    else:
+        claude_md.write_text(CLAUDE_MD_SNIPPET + "\n")
+        print("  ✓ Created CLAUDE.md")
+
+    print()
+    print("Done! Start a new Claude Code session — memex will be active automatically.")
+    print(f"Memory DB location: ~/.memex/")
+
+
+def remove() -> None:
+    print("Removing memex...")
+    removed = False
+    for config_path in [GLOBAL_CONFIG, LOCAL_CONFIG]:
+        config = _load_json(config_path)
+        mcp_servers = config.get("mcpServers", {})
+        for key in ("memex", "claude-mem"):
+            if key in mcp_servers:
+                del mcp_servers[key]
+                _save_json(config_path, config)
+                print(f"  ✓ Removed '{key}' from {config_path}")
+                removed = True
+
+    if not removed:
+        print("  — memex not found in any Claude Code config")
+
+    print()
+    print("Note: memory DBs kept at ~/.memex/ — delete manually if you want to wipe them.")
+
+
+def list_entries(tag: str | None = None, limit: int = 20) -> None:
+    db = _db_path()
+    if not db.exists():
+        print("No memories saved for this project yet.")
+        return
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    if tag:
+        rows = conn.execute(
+            "SELECT * FROM entries WHERE tags LIKE ? ORDER BY id DESC LIMIT ?",
+            (f'%"{tag}"%', limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM entries ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    conn.close()
+
+    if not rows:
+        print(f"No entries{f' with tag {tag!r}' if tag else ''}.")
+        return
+
+    print(f"=== memex: {len(rows)} entries ({db.name}) ===\n")
+    for row in rows:
+        print(_format_row(dict(row)))
+        print()
+
+
+def search_entries(query: str, limit: int = 10) -> None:
+    db = _db_path()
+    if not db.exists():
+        print("No memories saved for this project yet.")
+        return
+
+    safe = re.sub(r"[^a-zA-Z0-9 _\-]", " ", query).strip()
+    if not safe:
+        print("Query is empty after sanitisation.")
+        return
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """SELECT e.* FROM entries e
+           JOIN entries_fts f ON f.rowid = e.id
+           WHERE entries_fts MATCH ?
+           ORDER BY rank LIMIT ?""",
+        (safe, limit),
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        print(f"No entries matched '{query}'.")
+        return
+
+    print(f"=== memex: {len(rows)} results for '{query}' ===\n")
+    for row in rows:
+        print(_format_row(dict(row)))
+        print()
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="memex — persistent session memory for Claude Code",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", metavar="command")
+
+    install_parser = subparsers.add_parser("install", help="Install memex into Claude Code")
+    install_parser.add_argument("--local", action="store_true",
+                                help="Install for this project only")
+
+    subparsers.add_parser("remove", help="Remove memex from Claude Code config")
+
+    list_parser = subparsers.add_parser("list", help="Show recent memory entries")
+    list_parser.add_argument("--tag", help="Filter by tag")
+    list_parser.add_argument("--limit", type=int, default=20, help="Max entries (default 20)")
+
+    search_parser = subparsers.add_parser("search", help="Search memory entries")
+    search_parser.add_argument("query", help="Search query")
+    search_parser.add_argument("--limit", type=int, default=10, help="Max results (default 10)")
+
+    subparsers.add_parser("version", help="Print version")
+
+    args = parser.parse_args()
+
+    if args.command == "install":
+        install(local=args.local)
+    elif args.command == "remove":
+        remove()
+    elif args.command == "list":
+        list_entries(tag=args.tag, limit=args.limit)
+    elif args.command == "search":
+        search_entries(query=args.query, limit=args.limit)
+    elif args.command == "version":
+        print(f"memex {__version__}")
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

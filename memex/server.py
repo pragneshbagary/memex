@@ -200,8 +200,26 @@ def mem_save(
             entry,
         )
         new_id = cur.lastrowid
-    return f"✓ Saved memory #{new_id}: {task[:80]}"
+    msg = f"✓ Saved memory #{new_id}: {task[:80]}"
 
+    full_text = " ".join([
+        task or "",
+        json.dumps(files or []),
+        json.dumps(decisions or []),
+        json.dumps(warnings or []),
+        json.dumps(tags or []),
+        (notes or "")
+    ])
+
+    approx_tokens = len(full_text) // 4
+    threshold = int(os.environ.get("MEMEX_WARN_TOKENS", "300"))
+
+    if approx_tokens > threshold:
+        msg += (
+            f"\n⚠ This entry is long (~{approx_tokens} tokens). "
+            "Consider keeping each field to one line."
+        )
+    return msg 
 
 @mcp.tool()
 def mem_load(

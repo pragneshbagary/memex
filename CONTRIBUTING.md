@@ -30,7 +30,6 @@ The two main files:
 3. Make sure `memex install` and `memex list` still work
 4. Open a PR — describe what you changed and why
 
-That's it. No CLA, no sign-off process.
 
 ## Questions
 

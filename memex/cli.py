@@ -5,10 +5,12 @@ memex CLI — wire memex into Claude Code and browse memories from the terminal.
 Usage:
     memex install              # global (~/.claude.json)
     memex install --local      # this project only (.claude.json)
+    memex install --no-hook    # skip writing the auto-save stop hook
     memex remove               # remove from config
     memex list [--tag TAG]     # show recent entries for this project
     memex search QUERY         # search entries for this project
     memex version              # print version
+    memex hook-stop            # (internal) called by the Claude Code stop hook
 """
 
 import argparse
@@ -23,6 +25,11 @@ from memex import __version__
 
 GLOBAL_CONFIG = Path.home() / ".claude.json"
 LOCAL_CONFIG = Path.cwd() / ".claude.json"
+
+GLOBAL_SETTINGS = Path.home() / ".claude" / "settings.json"
+LOCAL_SETTINGS = Path.cwd() / ".claude" / "settings.json"
+
+STOP_HOOK_COMMAND = f"{sys.executable} -m memex.cli hook-stop"
 
 CLAUDE_MD_SNIPPET = """
 ## memex: Session Memory
@@ -101,11 +108,53 @@ def _format_row(row: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Hook helpers
+# ---------------------------------------------------------------------------
+
+def _install_stop_hook(settings_path: Path) -> None:
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = _load_json(settings_path)
+    hooks = settings.setdefault("hooks", {})
+    stop_hooks = hooks.setdefault("Stop", [])
+
+    for entry in stop_hooks:
+        for h in entry.get("hooks", []):
+            if h.get("command") == STOP_HOOK_COMMAND:
+                print(f"  ✓ Stop hook already present in {settings_path} — skipped")
+                return
+
+    stop_hooks.append({
+        "matcher": "",
+        "hooks": [{"type": "command", "command": STOP_HOOK_COMMAND}],
+    })
+    _save_json(settings_path, settings)
+    print(f"  ✓ Stop hook written: {settings_path}")
+
+
+def _remove_stop_hook(settings_path: Path) -> bool:
+    if not settings_path.exists():
+        return False
+    settings = _load_json(settings_path)
+    stop_hooks = settings.get("hooks", {}).get("Stop", [])
+    original_len = len(stop_hooks)
+    settings["hooks"]["Stop"] = [
+        entry for entry in stop_hooks
+        if not any(h.get("command") == STOP_HOOK_COMMAND for h in entry.get("hooks", []))
+    ]
+    if len(settings["hooks"]["Stop"]) < original_len:
+        _save_json(settings_path, settings)
+        print(f"  ✓ Removed stop hook from {settings_path}")
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 
-def install(local: bool = False) -> None:
+def install(local: bool = False, no_hook: bool = False) -> None:
     config_path = LOCAL_CONFIG if local else GLOBAL_CONFIG
+    settings_path = LOCAL_SETTINGS if local else GLOBAL_SETTINGS
     scope = "local project" if local else "global"
     print(f"Installing memex ({scope})...")
 
@@ -120,6 +169,11 @@ def install(local: bool = False) -> None:
 
     _save_json(config_path, config)
     print(f"  ✓ MCP entry written: {config_path}")
+
+    if no_hook:
+        print("  — Stop hook skipped (--no-hook)")
+    else:
+        _install_stop_hook(settings_path)
 
     claude_md = Path.cwd() / "CLAUDE.md"
     if claude_md.exists():
@@ -151,11 +205,53 @@ def remove() -> None:
                 print(f"  ✓ Removed '{key}' from {config_path}")
                 removed = True
 
+    for settings_path in [GLOBAL_SETTINGS, LOCAL_SETTINGS]:
+        if _remove_stop_hook(settings_path):
+            removed = True
+
     if not removed:
         print("  — memex not found in any Claude Code config")
 
     print()
     print("Note: memory DBs kept at ~/.memex/ — delete manually if you want to wipe them.")
+
+
+def hook_stop() -> None:
+    """Called by the Claude Code Stop hook. Checks the transcript for a recent
+    mem_save call; if none is found, prompts Claude to save and exits 2 so
+    Claude gets one more turn to do so."""
+    import json as _json
+
+    try:
+        payload = _json.load(sys.stdin)
+        transcript_path = payload.get("transcript_path", "")
+    except Exception:
+        transcript_path = ""
+
+    if transcript_path and Path(transcript_path).exists():
+        try:
+            lines = Path(transcript_path).read_text().splitlines()
+            # Check the last 20 lines for a mem_save tool call
+            for line in lines[-20:]:
+                try:
+                    entry = _json.loads(line)
+                except Exception:
+                    continue
+                # Tool use entries have type "tool_use" and name "mem_save"
+                if entry.get("type") == "tool_use" and entry.get("name") == "mem_save":
+                    sys.exit(0)
+                # Also check nested content arrays (assistant messages)
+                for block in entry.get("content", []):
+                    if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "mem_save":
+                        sys.exit(0)
+        except Exception:
+            pass
+
+    print(
+        "Session is ending. Please call mem_save() now to record what you worked on "
+        "so you have context in your next session."
+    )
+    sys.exit(2)
 
 
 def list_entries(tag: str | None = None, limit: int = 20) -> None:
@@ -233,6 +329,8 @@ def main() -> None:
     install_parser = subparsers.add_parser("install", help="Install memex into Claude Code")
     install_parser.add_argument("--local", action="store_true",
                                 help="Install for this project only")
+    install_parser.add_argument("--no-hook", action="store_true",
+                                help="Skip writing the auto-save stop hook")
 
     subparsers.add_parser("remove", help="Remove memex from Claude Code config")
 
@@ -245,11 +343,12 @@ def main() -> None:
     search_parser.add_argument("--limit", type=int, default=10, help="Max results (default 10)")
 
     subparsers.add_parser("version", help="Print version")
+    subparsers.add_parser("hook-stop", help="(internal) Auto-save hook called at session end")
 
     args = parser.parse_args()
 
     if args.command == "install":
-        install(local=args.local)
+        install(local=args.local, no_hook=args.no_hook)
     elif args.command == "remove":
         remove()
     elif args.command == "list":
@@ -258,6 +357,8 @@ def main() -> None:
         search_entries(query=args.query, limit=args.limit)
     elif args.command == "version":
         print(f"memex {__version__}")
+    elif args.command == "hook-stop":
+        hook_stop()
     else:
         parser.print_help()
 

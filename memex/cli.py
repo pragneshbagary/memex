@@ -355,7 +355,7 @@ def _entry_to_markdown(row: dict, related: list[str]) -> str:
         lines.append("")
     if files:
         lines.append("## Files")
-        lines += [f"- [[{f}]]" for f in files]
+        lines += [f"- `{f}`" for f in files]
         lines.append("")
     if row.get("raw"):
         lines += ["## Notes", row["raw"], ""]
@@ -391,7 +391,7 @@ def export_entries(dest: str) -> None:
     names: dict[int, str] = {}
     used: set[str] = set()
     for row in rows:
-        base = f"{row['timestamp'][:10]}-{_slugify(row['task'])}"
+        base = f"{(row['timestamp'] or '')[:10]}-{_slugify(row['task'] or '')}"
         name = base if base not in used else f"{base}-{row['id']}"
         used.add(name)
         names[row["id"]] = name
@@ -406,7 +406,7 @@ def export_entries(dest: str) -> None:
             and (tags & set(_parse_list(other, "tags")) or files & set(_parse_list(other, "files")))
         ]
         (dest_path / f"{names[row['id']]}.md").write_text(
-            _entry_to_markdown(row, related)
+            _entry_to_markdown(row, related), encoding="utf-8"
         )
 
     print(f"✓ Exported {len(rows)} entries to {dest_path}/")

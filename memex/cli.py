@@ -9,6 +9,7 @@ Usage:
     memex remove               # remove from config
     memex list [--tag TAG]     # show recent entries for this project
     memex search QUERY         # search entries for this project
+    memex export DIR           # export entries as linked markdown files
     memex version              # print version
     memex hook-stop            # (internal) called by the Claude Code stop hook
 """
@@ -316,6 +317,102 @@ def search_entries(query: str, limit: int = 10) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Export
+# ---------------------------------------------------------------------------
+
+def _slugify(text: str, max_words: int = 6) -> str:
+    words = re.sub(r"[^a-z0-9\s-]", "", text.lower()).split()
+    slug = "-".join(words[:max_words]).strip("-")
+    return slug or "entry"
+
+
+def _parse_list(row: dict, field: str) -> list:
+    try:
+        value = json.loads(row[field])
+        return value if isinstance(value, list) else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+def _entry_to_markdown(row: dict, related: list[str]) -> str:
+    tags = _parse_list(row, "tags")
+    files = _parse_list(row, "files")
+    decisions = _parse_list(row, "decisions")
+    warnings = _parse_list(row, "warnings")
+
+    lines = ["---", f"id: {row['id']}", f"date: {row['timestamp']}"]
+    if tags:
+        lines.append(f"tags: [{', '.join(tags)}]")
+    lines += ["---", "", f"# {row['task']}", ""]
+
+    if decisions:
+        lines.append("## Decisions")
+        lines += [f"- {d}" for d in decisions]
+        lines.append("")
+    if warnings:
+        lines.append("## Warnings")
+        lines += [f"- {w}" for w in warnings]
+        lines.append("")
+    if files:
+        lines.append("## Files")
+        lines += [f"- [[{f}]]" for f in files]
+        lines.append("")
+    if row.get("raw"):
+        lines += ["## Notes", row["raw"], ""]
+    if related:
+        lines.append("## Related")
+        lines += [f"- [[{name}]]" for name in related]
+        lines.append("")
+    if tags:
+        lines += [" ".join(f"#{t}" for t in tags), ""]
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def export_entries(dest: str) -> None:
+    db = _db_path()
+    if not db.exists():
+        print("No memories saved for this project yet.")
+        return
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    rows = [dict(r) for r in conn.execute("SELECT * FROM entries ORDER BY id").fetchall()]
+    conn.close()
+
+    if not rows:
+        print("No entries to export.")
+        return
+
+    dest_path = Path(dest)
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    # Stable note name per entry: YYYY-MM-DD-slug, disambiguated by id on collision.
+    names: dict[int, str] = {}
+    used: set[str] = set()
+    for row in rows:
+        base = f"{row['timestamp'][:10]}-{_slugify(row['task'])}"
+        name = base if base not in used else f"{base}-{row['id']}"
+        used.add(name)
+        names[row["id"]] = name
+
+    for row in rows:
+        tags = set(_parse_list(row, "tags"))
+        files = set(_parse_list(row, "files"))
+        related = [
+            names[other["id"]]
+            for other in rows
+            if other["id"] != row["id"]
+            and (tags & set(_parse_list(other, "tags")) or files & set(_parse_list(other, "files")))
+        ]
+        (dest_path / f"{names[row['id']]}.md").write_text(
+            _entry_to_markdown(row, related)
+        )
+
+    print(f"✓ Exported {len(rows)} entries to {dest_path}/")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -342,6 +439,9 @@ def main() -> None:
     search_parser.add_argument("query", help="Search query")
     search_parser.add_argument("--limit", type=int, default=10, help="Max results (default 10)")
 
+    export_parser = subparsers.add_parser("export", help="Export entries as linked markdown files")
+    export_parser.add_argument("dir", help="Destination directory")
+
     subparsers.add_parser("version", help="Print version")
     subparsers.add_parser("hook-stop", help="(internal) Auto-save hook called at session end")
 
@@ -355,6 +455,8 @@ def main() -> None:
         list_entries(tag=args.tag, limit=args.limit)
     elif args.command == "search":
         search_entries(query=args.query, limit=args.limit)
+    elif args.command == "export":
+        export_entries(args.dir)
     elif args.command == "version":
         print(f"memex {__version__}")
     elif args.command == "hook-stop":

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-memex"
-version = "0.1.0"
+version = "0.1.1"
 description = "Persistent session memory for Claude Code — local SQLite, no LLMs, no network"
 readme = "README.md"
 license = { text = "MIT" }

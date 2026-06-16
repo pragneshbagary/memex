@@ -9,7 +9,7 @@ No cloud. No LLM extraction. No cost per save. Just local SQLite and two command
 ## Install
 
 ```bash
-pip install memex
+pip install mcp-memex
 memex install
 ```
 
@@ -98,7 +98,7 @@ Set these in the MCP `env` block in `~/.claude.json` if you need to override def
 
 ```bash
 memex remove
-pip uninstall memex
+pip uninstall mcp-memex
 ```
 
 Memory DBs are kept at `~/.memex/` — delete that directory manually if you want to wipe everything.

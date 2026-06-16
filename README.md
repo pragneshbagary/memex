@@ -63,6 +63,19 @@ memex list --tag auth       # filter by tag
 memex search "rate limit"   # full-text search
 ```
 
+## Export to markdown
+
+Turn your history into portable, human-browsable notes — one `.md` file per
+entry, with `[[wikilinks]]` connecting related entries and files, plus tags as
+`#hashtags`. Works in Obsidian or any tool that understands `[[links]]`:
+
+```bash
+memex export ./my-project-notes/
+```
+
+Entries that share a tag or a touched file are cross-linked under a **Related**
+section, so you can navigate your project history as a graph.
+
 ## Five MCP tools
 
 | Tool | What it does |

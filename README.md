@@ -1,5 +1,7 @@
 # memex
 
+![memex demo](docs/demo.gif)
+
 Every Claude Code session starts without knowing what you built last time — which files you changed, what decisions you made, what broke. You re-explain. Claude re-reads. You start over.
 
 **memex keeps a structured log of every session. Claude reads it at the start of the next one.**

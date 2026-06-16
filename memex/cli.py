@@ -250,9 +250,10 @@ def hook_stop() -> None:
 
     print(
         "Session is ending. Please call mem_save() now to record what you worked on "
-        "so you have context in your next session."
+        "so you have context in your next session.",
+        file=sys.stderr,
     )
-    sys.exit(2)
+    sys.exit(0)
 
 
 def list_entries(tag: str | None = None, limit: int = 20) -> None:

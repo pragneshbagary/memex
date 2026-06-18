@@ -99,6 +99,34 @@ def test_remove_when_not_installed(install_env, capsys):
 
 
 # ---------------------------------------------------------------------------
+# status
+# ---------------------------------------------------------------------------
+
+def test_status_no_db(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_db_path", lambda: tmp_path / "nonexistent.db")
+    cli.status()
+    out = capsys.readouterr().out
+    assert "memex" in out
+    assert "No memories" in out
+
+
+def test_status_shows_entry_count(db_setup, capsys):
+    srv.mem_save(task="Task A", tags=["alpha"])
+    srv.mem_save(task="Task B", tags=["alpha", "beta"])
+    cli.status()
+    out = capsys.readouterr().out
+    assert "Entries: 2" in out
+    assert "alpha" in out
+
+
+def test_status_shows_db_path(db_setup, capsys):
+    cli.status()
+    out = capsys.readouterr().out
+    assert "DB:" in out
+    assert "test.db" in out
+
+
+# ---------------------------------------------------------------------------
 # list_entries
 # ---------------------------------------------------------------------------
 

@@ -18,5 +18,8 @@ Issues = "https://github.com/pragneshbagary/memex/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["memex"]
 
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
 [project.scripts]
 memex = "memex.cli:main"

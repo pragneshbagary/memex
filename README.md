@@ -92,6 +92,8 @@ section, so you can navigate your project history as a graph.
 
 memex captures what's changing session to session: what you built yesterday, the decision you made this morning, the warning you discovered an hour ago. It's the difference between *"here's the project"* and *"here's what happened last time."*
 
+`memex install` writes Claude's instructions into `.claude/memex.md` — a file Claude Code loads automatically without touching your project's own `CLAUDE.md`.
+
 ## Memory is scoped per project
 
 Each project gets its own SQLite database at `~/.memex/<project>.db` based on the working directory. Sessions from different projects never mix.

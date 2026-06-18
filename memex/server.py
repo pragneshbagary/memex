@@ -383,6 +383,63 @@ def mem_delete(entry_id: int) -> str:
     return f"✓ Deleted entry #{entry_id}."
 
 
+@mcp.tool()
+def mem_update(
+    entry_id: int,
+    task: Optional[str] = None,
+    files: Optional[list[str]] = None,
+    decisions: Optional[list[str]] = None,
+    warnings: Optional[list[str]] = None,
+    tags: Optional[list[str]] = None,
+    notes: Optional[str] = None,
+) -> str:
+    """
+    Update an existing memory entry. Only the fields you supply are changed.
+
+    Args:
+        entry_id:  The numeric id shown in mem_list or mem_load output.
+        task:      Replacement one-sentence summary.
+        files:     Replacement list of files touched.
+        decisions: Replacement list of decisions.
+        warnings:  Replacement list of warnings.
+        tags:      Replacement list of tags.
+        notes:     Replacement freeform notes.
+
+    Use this to correct a typo, add a warning you forgot, or update tags
+    without losing the entry's original id and timestamp.
+    """
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM entries WHERE id = ?", (entry_id,)).fetchone()
+        if row is None:
+            return f"No entry with id {entry_id}."
+        existing = _row_to_dict(row)
+
+    updates: dict = {}
+    if task is not None:
+        updates["task"] = task.strip()
+    if files is not None:
+        updates["files"] = json.dumps(files)
+    if decisions is not None:
+        updates["decisions"] = json.dumps(decisions)
+    if warnings is not None:
+        updates["warnings"] = json.dumps(warnings)
+    if tags is not None:
+        updates["tags"] = json.dumps(tags)
+    if notes is not None:
+        updates["raw"] = notes.strip()
+
+    if not updates:
+        return f"Nothing to update for entry #{entry_id} — no fields supplied."
+
+    set_clause = ", ".join(f"{col} = ?" for col in updates)
+    values = list(updates.values()) + [entry_id]
+    with get_conn() as conn:
+        conn.execute(f"UPDATE entries SET {set_clause} WHERE id = ?", values)
+
+    changed = ", ".join(updates.keys())
+    return f"✓ Updated entry #{entry_id} ({changed})."
+
+
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------

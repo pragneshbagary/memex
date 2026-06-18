@@ -58,6 +58,7 @@ Claude calls `mem_load` automatically at the start of every session. It returns 
 You don't need to be inside Claude to look at your history:
 
 ```bash
+memex status                # entry count, DB size, top tags
 memex list                  # recent entries for this project
 memex list --tag auth       # filter by tag
 memex search "rate limit"   # full-text search
@@ -76,12 +77,13 @@ memex export ./my-project-notes/
 Entries that share a tag or a touched file are cross-linked under a **Related**
 section, so you can navigate your project history as a graph.
 
-## Five MCP tools
+## Six MCP tools
 
 | Tool | What it does |
 |------|--------------|
 | `mem_load` | Called at session start — returns recent + relevant entries |
 | `mem_save` | Saves a structured entry after meaningful work |
+| `mem_update` | Patches specific fields of an existing entry (keeps id and timestamp) |
 | `mem_search` | Full-text search across all entries |
 | `mem_list` | Lists entries, optionally filtered by tag |
 | `mem_delete` | Removes a stale entry by id |

@@ -415,6 +415,39 @@ def export_entries(dest: str) -> None:
     print(f"✓ Exported {len(rows)} entries to {dest_path}/")
 
 
+def status() -> None:
+    from memex import __version__
+    db = _db_path()
+    print(f"memex {__version__}")
+    print(f"DB: {db}")
+
+    if not db.exists():
+        print("No memories saved for this project yet.")
+        return
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    count = conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
+    last_row = conn.execute("SELECT timestamp FROM entries ORDER BY id DESC LIMIT 1").fetchone()
+    tag_rows = conn.execute("SELECT tags FROM entries WHERE tags != '[]'").fetchall()
+    conn.close()
+
+    size_kb = db.stat().st_size // 1024
+    last_ts = last_row["timestamp"][:16] if last_row else "—"
+    print(f"Entries: {count}  |  Size: {size_kb} KB  |  Last saved: {last_ts}")
+
+    tag_counts: dict[str, int] = {}
+    for row in tag_rows:
+        try:
+            for t in json.loads(row["tags"]):
+                tag_counts[t] = tag_counts.get(t, 0) + 1
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if tag_counts:
+        top = sorted(tag_counts.items(), key=lambda x: -x[1])[:8]
+        print("Tags: " + ", ".join(f"{t} ({n})" for t, n in top))
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -445,6 +478,7 @@ def main() -> None:
     export_parser = subparsers.add_parser("export", help="Export entries as linked markdown files")
     export_parser.add_argument("dir", help="Destination directory")
 
+    subparsers.add_parser("status", help="Show entry count, DB size, and top tags")
     subparsers.add_parser("version", help="Print version")
     subparsers.add_parser("hook-stop", help="(internal) Auto-save hook called at session end")
 
@@ -460,6 +494,8 @@ def main() -> None:
         search_entries(query=args.query, limit=args.limit)
     elif args.command == "export":
         export_entries(args.dir)
+    elif args.command == "status":
+        status()
     elif args.command == "version":
         print(f"memex {__version__}")
     elif args.command == "hook-stop":

@@ -184,6 +184,56 @@ def test_mem_delete_cleans_fts_index(mem_db):
     assert "No entries" in result
 
 
+
+# ---------------------------------------------------------------------------
+# mem_update
+# ---------------------------------------------------------------------------
+
+def test_mem_update_task(mem_db):
+    srv.mem_save(task="Original task")
+    result = srv.mem_update(1, task="Updated task")
+    assert "Updated" in result
+    assert "task" in result
+    assert "Original" not in srv.mem_list()
+
+
+def test_mem_update_preserves_untouched_fields(mem_db):
+    srv.mem_save(task="Keep me", tags=["keep"], files=["keep.py"])
+    srv.mem_update(1, task="New task name")
+    with srv.get_conn() as conn:
+        row = dict(conn.execute("SELECT * FROM entries WHERE id=1").fetchone())
+    import json as _json
+    assert _json.loads(row["tags"]) == ["keep"]
+    assert _json.loads(row["files"]) == ["keep.py"]
+
+
+def test_mem_update_multiple_fields(mem_db):
+    srv.mem_save(task="Old", warnings=["Old warning"])
+    srv.mem_update(1, task="New", warnings=["New warning"])
+    result = srv.mem_list()
+    assert "New" in result
+    assert "New warning" in result
+    assert "Old warning" not in result
+
+
+def test_mem_update_unknown_id(mem_db):
+    result = srv.mem_update(999, task="Nope")
+    assert "No entry" in result
+
+
+def test_mem_update_no_fields(mem_db):
+    srv.mem_save(task="No change")
+    result = srv.mem_update(1)
+    assert "Nothing to update" in result
+
+
+def test_mem_update_fts_index_reflects_change(mem_db):
+    srv.mem_save(task="Unique token aaabbb111")
+    srv.mem_update(1, task="Completely different cccdd222")
+    assert "No entries" in srv.mem_search("aaabbb111")
+    assert "Completely different" in srv.mem_search("cccdd222")
+
+
 # ---------------------------------------------------------------------------
 # FTS trigger integrity
 # ---------------------------------------------------------------------------

@@ -176,30 +176,13 @@ def install(local: bool = False, no_hook: bool = False) -> None:
     else:
         _install_stop_hook(settings_path)
 
-    claude_md = Path.cwd() / "CLAUDE.md"
-    if claude_md.exists():
-        existing = claude_md.read_text()
-        if "memex" in existing:
-            print("  ✓ CLAUDE.md already has memex section — skipped")
-        else:
-            claude_md.write_text(existing.rstrip() + "\n\n" + CLAUDE_MD_SNIPPET + "\n")
-            print("  ✓ Appended memex section to CLAUDE.md")
+    memex_md = Path.cwd() / ".claude" / "memex.md"
+    memex_md.parent.mkdir(parents=True, exist_ok=True)
+    if memex_md.exists():
+        print("  ✓ .claude/memex.md already exists — skipped")
     else:
-        claude_md.write_text(CLAUDE_MD_SNIPPET + "\n")
-        print("  ✓ Created CLAUDE.md")
-
-    gitignore = Path.cwd() / ".gitignore"
-    gitignore_entry = "CLAUDE.md"
-    if gitignore.exists():
-        existing = gitignore.read_text()
-        if gitignore_entry in existing:
-            print("  ✓ .gitignore already excludes CLAUDE.md — skipped")
-        else:
-            gitignore.write_text(existing.rstrip() + "\n" + gitignore_entry + "\n")
-            print("  ✓ Added CLAUDE.md to .gitignore")
-    else:
-        gitignore.write_text(gitignore_entry + "\n")
-        print("  ✓ Created .gitignore with CLAUDE.md")
+        memex_md.write_text(CLAUDE_MD_SNIPPET + "\n")
+        print("  ✓ Created .claude/memex.md")
 
     print()
     print("Done! Start a new Claude Code session — memex will be active automatically.")
@@ -222,6 +205,12 @@ def remove() -> None:
     for settings_path in [GLOBAL_SETTINGS, LOCAL_SETTINGS]:
         if _remove_stop_hook(settings_path):
             removed = True
+
+    memex_md = Path.cwd() / ".claude" / "memex.md"
+    if memex_md.exists():
+        memex_md.unlink()
+        print("  ✓ Removed .claude/memex.md")
+        removed = True
 
     if not removed:
         print("  — memex not found in any Claude Code config")

@@ -78,15 +78,17 @@ def _parse_date(value: str) -> str:
     if m and (m.group(2) in units):
         n, unit = int(m.group(1)), m.group(2)
         delta = timedelta(days=n * units[unit])
-        return (datetime.now(timezone.utc) - delta).isoformat()
+        return (datetime.now(timezone.utc) - delta).isoformat(timespec="seconds")
     try:
-        datetime.fromisoformat(value)
+        dt = datetime.fromisoformat(value)
     except ValueError:
         raise ValueError(
             f"Cannot parse date {value!r}. "
             "Use a relative offset (e.g. '7d', '2w') or an ISO date (e.g. '2026-06-01')."
         )
-    return value
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat(timespec="seconds")
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -20,6 +20,7 @@ import os
 import re
 import sqlite3
 import sys
+from datetime import (datetime, timedelta, timezone,)
 from pathlib import Path
 
 from memex import __version__
@@ -67,6 +68,27 @@ Other tools:
 Memory is stored locally in ~/.memex/ as SQLite — no LLMs, no network.
 """.strip()
 
+# ---------------------------------------------------------------------------
+# Date parsing
+# ---------------------------------------------------------------------------
+
+def _parse_date(value: str) -> str:
+    units = {"d": 1, "w": 7, "m": 30, "y": 365}
+    m = re.compile(r"^(\d+)([dwmy])$").match(value.strip())
+    if m and (m.group(2) in units):
+        n, unit = int(m.group(1)), m.group(2)
+        delta = timedelta(days=n * units[unit])
+        return (datetime.now(timezone.utc) - delta).isoformat(timespec="seconds")
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError(
+            f"Cannot parse date {value!r}. "
+            "Use a relative offset (e.g. '7d', '2w') or an ISO date (e.g. '2026-06-01')."
+        )
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat(timespec="seconds")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -258,23 +280,41 @@ def hook_stop() -> None:
     sys.exit(0)
 
 
-def list_entries(tag: str | None = None, limit: int = 20) -> None:
+def list_entries(
+    tag: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    limit: int = 20
+) -> None:
     db = _db_path()
     if not db.exists():
         print("No memories saved for this project yet.")
         return
 
+    conditions: list[str] = []
+    params: list = []
+
+    if tag:
+        conditions.append("tags LIKE ?")
+        params.append(f'%"{tag}"%')
+    if since:
+        since_ts = _parse_date(since)
+        conditions.append("timestamp >= ?")
+        params.append(since_ts)
+    if until:
+        until_ts = _parse_date(until)
+        conditions.append("timestamp <= ?")
+        params.append(until_ts)
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    params.append(limit)
+
     conn = sqlite3.connect(db)
     conn.row_factory = sqlite3.Row
-    if tag:
-        rows = conn.execute(
-            "SELECT * FROM entries WHERE tags LIKE ? ORDER BY id DESC LIMIT ?",
-            (f'%"{tag}"%', limit),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM entries ORDER BY id DESC LIMIT ?", (limit,)
-        ).fetchall()
+    rows = conn.execute(
+        f"SELECT * FROM entries {where} ORDER BY id DESC LIMIT ?",
+        params,
+    ).fetchall()
     conn.close()
 
     if not rows:
@@ -470,6 +510,12 @@ def main() -> None:
     list_parser = subparsers.add_parser("list", help="Show recent memory entries")
     list_parser.add_argument("--tag", help="Filter by tag")
     list_parser.add_argument("--limit", type=int, default=20, help="Max entries (default 20)")
+    list_parser.add_argument("--since", metavar="DATE",
+        help="Only show entries after this date (e.g. '7d', '2026-06-01')",
+    )
+    list_parser.add_argument("--until", metavar="DATE",
+        help="Only show entries before this date (e.g. '2026-06-15')",
+    )
 
     search_parser = subparsers.add_parser("search", help="Search memory entries")
     search_parser.add_argument("query", help="Search query")
@@ -489,7 +535,7 @@ def main() -> None:
     elif args.command == "remove":
         remove()
     elif args.command == "list":
-        list_entries(tag=args.tag, limit=args.limit)
+        list_entries(tag=args.tag, limit=args.limit, since=args.since, until=args.until)
     elif args.command == "search":
         search_entries(query=args.query, limit=args.limit)
     elif args.command == "export":

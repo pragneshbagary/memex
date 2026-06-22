@@ -163,6 +163,76 @@ def test_list_respects_limit(db_setup, capsys):
 
 
 # ---------------------------------------------------------------------------
+# list_entries --since / --until
+# ---------------------------------------------------------------------------
+
+def _insert_entry_with_timestamp(db_path, task: str, timestamp: str) -> None:
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO entries (task, files, decisions, warnings, tags, raw, timestamp) "
+        "VALUES (?, '[]', '[]', '[]', '[]', '', ?)",
+        (task, timestamp),
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_list_since_filters_old_entries(db_setup, capsys):
+    _insert_entry_with_timestamp(db_setup, "Old task", "2026-01-01T00:00:00+00:00")
+    _insert_entry_with_timestamp(db_setup, "Recent task", "2026-06-10T00:00:00+00:00")
+    cli.list_entries(since="2026-06-01")
+    out = capsys.readouterr().out
+    assert "Recent task" in out
+    assert "Old task" not in out
+
+
+def test_list_until_filters_future_entries(db_setup, capsys):
+    _insert_entry_with_timestamp(db_setup, "Early task", "2026-01-15T00:00:00+00:00")
+    _insert_entry_with_timestamp(db_setup, "Late task", "2026-12-01T00:00:00+00:00")
+    cli.list_entries(until="2026-06-01")
+    out = capsys.readouterr().out
+    assert "Early task" in out
+    assert "Late task" not in out
+
+
+def test_list_since_and_until_combined(db_setup, capsys):
+    _insert_entry_with_timestamp(db_setup, "Before range", "2026-01-01T00:00:00+00:00")
+    _insert_entry_with_timestamp(db_setup, "In range", "2026-06-05T00:00:00+00:00")
+    _insert_entry_with_timestamp(db_setup, "After range", "2026-12-01T00:00:00+00:00")
+    cli.list_entries(since="2026-06-01", until="2026-06-30")
+    out = capsys.readouterr().out
+    assert "In range" in out
+    assert "Before range" not in out
+    assert "After range" not in out
+
+
+def test_list_since_relative_days(db_setup, capsys):
+    from datetime import datetime, timedelta, timezone
+    old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds")
+    new_ts = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    _insert_entry_with_timestamp(db_setup, "Month-old task", old_ts)
+    _insert_entry_with_timestamp(db_setup, "Yesterday task", new_ts)
+    cli.list_entries(since="7d")
+    out = capsys.readouterr().out
+    assert "Yesterday task" in out
+    assert "Month-old task" not in out
+
+
+def test_list_since_and_tag_combined(db_setup, capsys):
+    _insert_entry_with_timestamp(db_setup, "Old auth work", "2026-01-01T00:00:00+00:00")
+    srv.mem_save(task="Recent auth work", tags=["auth"])
+    cli.list_entries(tag="auth", since="2026-06-01")
+    out = capsys.readouterr().out
+    assert "Recent auth work" in out
+    assert "Old auth work" not in out
+
+
+def test_parse_date_invalid_raises(db_setup):
+    with pytest.raises(ValueError, match="Cannot parse date"):
+        cli._parse_date("not-a-date")
+
+
+# ---------------------------------------------------------------------------
 # search_entries
 # ---------------------------------------------------------------------------
 

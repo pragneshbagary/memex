@@ -535,7 +535,11 @@ def main() -> None:
     elif args.command == "remove":
         remove()
     elif args.command == "list":
-        list_entries(tag=args.tag, limit=args.limit, since=args.since, until=args.until)
+        try:
+            list_entries(tag=args.tag, limit=args.limit, since=args.since, until=args.until)
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(2)
     elif args.command == "search":
         search_entries(query=args.query, limit=args.limit)
     elif args.command == "export":

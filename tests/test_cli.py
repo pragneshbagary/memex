@@ -232,6 +232,24 @@ def test_parse_date_invalid_raises(db_setup):
         cli._parse_date("not-a-date")
 
 
+def test_list_invalid_since_exits_cleanly(db_setup, capsys):
+    """Invalid --since prints a clean error, not a raw traceback (issue #25)."""
+    with pytest.raises(SystemExit) as exc:
+        cli.list_entries(since="not-a-date")
+    assert exc.value.code != 0
+    captured = capsys.readouterr()
+    assert "Cannot parse date" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_list_invalid_until_exits_cleanly(db_setup, capsys):
+    """Invalid --until is handled on the same path as --since (issue #25)."""
+    with pytest.raises(SystemExit) as exc:
+        cli.list_entries(until="garbage")
+    assert exc.value.code != 0
+    assert "Cannot parse date" in capsys.readouterr().err
+
+
 # ---------------------------------------------------------------------------
 # search_entries
 # ---------------------------------------------------------------------------

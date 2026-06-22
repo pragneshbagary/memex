@@ -297,14 +297,18 @@ def list_entries(
     if tag:
         conditions.append("tags LIKE ?")
         params.append(f'%"{tag}"%')
-    if since:
-        since_ts = _parse_date(since)
-        conditions.append("timestamp >= ?")
-        params.append(since_ts)
-    if until:
-        until_ts = _parse_date(until)
-        conditions.append("timestamp <= ?")
-        params.append(until_ts)
+    try:
+        if since:
+            since_ts = _parse_date(since)
+            conditions.append("timestamp >= ?")
+            params.append(since_ts)
+        if until:
+            until_ts = _parse_date(until)
+            conditions.append("timestamp <= ?")
+            params.append(until_ts)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     params.append(limit)

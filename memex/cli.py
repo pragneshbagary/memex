@@ -72,9 +72,10 @@ Memory is stored locally in ~/.memex/ as SQLite — no LLMs, no network.
 # Date parsing
 # ---------------------------------------------------------------------------
 
-def _parse_date(value: str) -> str:
+def _parse_date(value: str, *, end_of_day: bool = False) -> str:
+    value = value.strip()
     units = {"d": 1, "w": 7, "m": 30, "y": 365}
-    m = re.compile(r"^(\d+)([dwmy])$").match(value.strip())
+    m = re.compile(r"^(\d+)([dwmy])$").match(value)
     if m and (m.group(2) in units):
         n, unit = int(m.group(1)), m.group(2)
         delta = timedelta(days=n * units[unit])
@@ -88,6 +89,8 @@ def _parse_date(value: str) -> str:
         )
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
+    if end_of_day and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        dt = dt.replace(hour=23, minute=59, second=59)
     return dt.isoformat(timespec="seconds")
 
 # ---------------------------------------------------------------------------
@@ -302,7 +305,7 @@ def list_entries(
         conditions.append("timestamp >= ?")
         params.append(since_ts)
     if until:
-        until_ts = _parse_date(until)
+        until_ts = _parse_date(until, end_of_day=True)
         conditions.append("timestamp <= ?")
         params.append(until_ts)
 

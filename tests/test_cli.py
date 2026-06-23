@@ -195,6 +195,15 @@ def test_list_until_filters_future_entries(db_setup, capsys):
     assert "Late task" not in out
 
 
+def test_list_until_date_includes_entries_later_that_day(db_setup, capsys):
+    _insert_entry_with_timestamp(db_setup, "Same day task", "2026-06-15T12:30:00+00:00")
+    _insert_entry_with_timestamp(db_setup, "Next day task", "2026-06-16T00:00:00+00:00")
+    cli.list_entries(until="2026-06-15")
+    out = capsys.readouterr().out
+    assert "Same day task" in out
+    assert "Next day task" not in out
+
+
 def test_list_since_and_until_combined(db_setup, capsys):
     _insert_entry_with_timestamp(db_setup, "Before range", "2026-01-01T00:00:00+00:00")
     _insert_entry_with_timestamp(db_setup, "In range", "2026-06-05T00:00:00+00:00")

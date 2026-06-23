@@ -63,6 +63,7 @@ mem_save(
 Other tools:
 - `mem_search(query)` — find past work on a specific topic
 - `mem_list()` — see all stored entries
+- `mem_update(id, ...)` — update fields on an existing entry
 - `mem_delete(id)` — remove stale entries
 
 Memory is stored locally in ~/.memex/ as SQLite — no LLMs, no network.

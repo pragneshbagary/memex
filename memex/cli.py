@@ -209,6 +209,15 @@ def install(local: bool = False, no_hook: bool = False) -> None:
         memex_md.write_text(CLAUDE_MD_SNIPPET + "\n")
         print("  ✓ Created .claude/memex.md")
 
+    gitignore = Path.cwd() / ".gitignore"
+    entry = ".claude/memex.md"
+    if gitignore.exists() and entry in gitignore.read_text().splitlines():
+        print("  ✓ .gitignore already ignores .claude/memex.md — skipped")
+    else:
+        with gitignore.open("a") as f:
+            f.write(f"\n{entry}\n")
+        print("  ✓ Added .claude/memex.md to .gitignore")
+
     print()
     print("Done! Start a new Claude Code session — memex will be active automatically.")
     print(f"Memory DB location: ~/.memex/")

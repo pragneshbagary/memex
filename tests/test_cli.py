@@ -63,9 +63,28 @@ def test_install_idempotent_memex_md(install_env, capsys):
     assert first_content == second_content
 
 
-def test_install_does_not_create_gitignore(install_env, capsys):
+def test_install_adds_memex_md_to_gitignore(install_env, capsys):
     cli.install()
-    assert not (install_env / ".gitignore").exists()
+    gitignore = install_env / ".gitignore"
+    assert gitignore.exists()
+    assert ".claude/memex.md" in gitignore.read_text().splitlines()
+
+
+def test_install_appends_to_existing_gitignore(install_env, capsys):
+    gitignore = install_env / ".gitignore"
+    gitignore.write_text("*.pyc\n")
+    cli.install()
+    lines = gitignore.read_text().splitlines()
+    assert "*.pyc" in lines
+    assert ".claude/memex.md" in lines
+
+
+def test_install_gitignore_idempotent(install_env, capsys):
+    cli.install()
+    content_after_first = (install_env / ".gitignore").read_text()
+    cli.install()
+    content_after_second = (install_env / ".gitignore").read_text()
+    assert content_after_first == content_after_second
 
 
 def test_remove_cleans_config(install_env, capsys):

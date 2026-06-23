@@ -209,14 +209,14 @@ def install(local: bool = False, no_hook: bool = False) -> None:
         memex_md.write_text(CLAUDE_MD_SNIPPET + "\n")
         print("  ✓ Created .claude/memex.md")
 
-    gitignore = Path.cwd() / ".gitignore"
+    git_exclude = Path.cwd() / ".git" / "info" / "exclude"
     entry = ".claude/memex.md"
-    if gitignore.exists() and entry in gitignore.read_text().splitlines():
-        print("  ✓ .gitignore already ignores .claude/memex.md — skipped")
-    else:
-        with gitignore.open("a") as f:
+    if git_exclude.exists() and entry in git_exclude.read_text().splitlines():
+        print("  ✓ .git/info/exclude already ignores .claude/memex.md — skipped")
+    elif git_exclude.exists():
+        with git_exclude.open("a") as f:
             f.write(f"\n{entry}\n")
-        print("  ✓ Added .claude/memex.md to .gitignore")
+        print("  ✓ Added .claude/memex.md to .git/info/exclude")
 
     print()
     print("Done! Start a new Claude Code session — memex will be active automatically.")

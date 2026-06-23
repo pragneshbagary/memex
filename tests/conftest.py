@@ -32,4 +32,7 @@ def install_env(tmp_path, monkeypatch):
     monkeypatch.setattr(cli_module, "GLOBAL_SETTINGS", tmp_path / ".claude" / "settings.json")
     monkeypatch.setattr(cli_module, "LOCAL_CONFIG", tmp_path / ".claude.json")
     monkeypatch.setattr(cli_module, "LOCAL_SETTINGS", tmp_path / ".claude" / "settings.json")
+    git_exclude = tmp_path / ".git" / "info" / "exclude"
+    git_exclude.parent.mkdir(parents=True)
+    git_exclude.write_text("")
     return tmp_path

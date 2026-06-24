@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-memex CLI — wire memex into Claude Code and browse memories from the terminal.
+memex CLI - wire memex into Claude Code and browse memories from the terminal.
 
 Usage:
     memex install              # global (~/.claude.json)
@@ -61,12 +61,12 @@ mem_save(
 ```
 
 Other tools:
-- `mem_search(query)` — find past work on a specific topic
-- `mem_list()` — see all stored entries
-- `mem_update(id, ...)` — update fields on an existing entry
-- `mem_delete(id)` — remove stale entries
+- `mem_search(query)` - find past work on a specific topic
+- `mem_list()` - see all stored entries
+- `mem_update(id, ...)` - update fields on an existing entry
+- `mem_delete(id)` - remove stale entries
 
-Memory is stored locally in ~/.memex/ as SQLite — no LLMs, no network.
+Memory is stored locally in ~/.memex/ as SQLite - no LLMs, no network.
 """.strip()
 
 # ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ def _load_json(path: Path) -> dict:
         try:
             return json.loads(path.read_text())
         except json.JSONDecodeError:
-            print(f"  ⚠ Could not parse {path} — treating as empty")
+            print(f"  ! Could not parse {path} - treating as empty")
     return {}
 
 
@@ -121,7 +121,7 @@ def _db_path() -> Path:
 
 
 def _format_row(row: dict) -> str:
-    lines = [f"#{row['id']} — {row['timestamp'][:16]}  {row['task']}"]
+    lines = [f"#{row['id']} - {row['timestamp'][:16]}  {row['task']}"]
     for field, label in (("files", "Files"), ("decisions", "Decision"), ("warnings", "Warning")):
         try:
             items = json.loads(row[field])
@@ -147,7 +147,7 @@ def _install_stop_hook(settings_path: Path) -> None:
     for entry in stop_hooks:
         for h in entry.get("hooks", []):
             if h.get("command") == STOP_HOOK_COMMAND:
-                print(f"  ✓ Stop hook already present in {settings_path} — skipped")
+                print(f"  Stop hook already present in {settings_path} - skipped")
                 return
 
     stop_hooks.append({
@@ -155,7 +155,7 @@ def _install_stop_hook(settings_path: Path) -> None:
         "hooks": [{"type": "command", "command": STOP_HOOK_COMMAND}],
     })
     _save_json(settings_path, settings)
-    print(f"  ✓ Stop hook written: {settings_path}")
+    print(f"  Stop hook written: {settings_path}")
 
 
 def _remove_stop_hook(settings_path: Path) -> bool:
@@ -170,7 +170,7 @@ def _remove_stop_hook(settings_path: Path) -> bool:
     ]
     if len(settings["hooks"]["Stop"]) < original_len:
         _save_json(settings_path, settings)
-        print(f"  ✓ Removed stop hook from {settings_path}")
+        print(f"  Removed stop hook from {settings_path}")
         return True
     return False
 
@@ -195,32 +195,32 @@ def install(local: bool = False, no_hook: bool = False) -> None:
     }
 
     _save_json(config_path, config)
-    print(f"  ✓ MCP entry written: {config_path}")
+    print(f"  MCP entry written: {config_path}")
 
     if no_hook:
-        print("  — Stop hook skipped (--no-hook)")
+        print("  Stop hook skipped (--no-hook)")
     else:
         _install_stop_hook(settings_path)
 
-    memex_md = Path.cwd() / ".claude" / "memex.md"
+    memex_md = Path.cwd() / ".claude" / "CLAUDE.local.md"
     memex_md.parent.mkdir(parents=True, exist_ok=True)
     if memex_md.exists():
-        print("  ✓ .claude/memex.md already exists — skipped")
+        print("  .claude/CLAUDE.local.md already exists - skipped")
     else:
         memex_md.write_text(CLAUDE_MD_SNIPPET + "\n")
-        print("  ✓ Created .claude/memex.md")
+        print("  Created .claude/CLAUDE.local.md")
 
     git_exclude = Path.cwd() / ".git" / "info" / "exclude"
-    entry = ".claude/memex.md"
+    entry = ".claude/CLAUDE.local.md"
     if git_exclude.exists() and entry in git_exclude.read_text().splitlines():
-        print("  ✓ .git/info/exclude already ignores .claude/memex.md — skipped")
+        print("  .git/info/exclude already ignores .claude/CLAUDE.local.md - skipped")
     elif git_exclude.exists():
         with git_exclude.open("a") as f:
             f.write(f"\n{entry}\n")
-        print("  ✓ Added .claude/memex.md to .git/info/exclude")
+        print("  Added .claude/CLAUDE.local.md to .git/info/exclude")
 
     print()
-    print("Done! Start a new Claude Code session — memex will be active automatically.")
+    print("Done! Start a new Claude Code session - memex will be active automatically.")
     print(f"Memory DB location: ~/.memex/")
 
 
@@ -234,24 +234,24 @@ def remove() -> None:
             if key in mcp_servers:
                 del mcp_servers[key]
                 _save_json(config_path, config)
-                print(f"  ✓ Removed '{key}' from {config_path}")
+                print(f"  Removed '{key}' from {config_path}")
                 removed = True
 
     for settings_path in [GLOBAL_SETTINGS, LOCAL_SETTINGS]:
         if _remove_stop_hook(settings_path):
             removed = True
 
-    memex_md = Path.cwd() / ".claude" / "memex.md"
+    memex_md = Path.cwd() / ".claude" / "CLAUDE.local.md"
     if memex_md.exists():
         memex_md.unlink()
-        print("  ✓ Removed .claude/memex.md")
+        print("  Removed .claude/CLAUDE.local.md")
         removed = True
 
     if not removed:
-        print("  — memex not found in any Claude Code config")
+        print("  memex not found in any Claude Code config")
 
     print()
-    print("Note: memory DBs kept at ~/.memex/ — delete manually if you want to wipe them.")
+    print("Note: memory DBs kept at ~/.memex/ - delete manually if you want to wipe them.")
 
 
 def hook_stop() -> None:
@@ -465,7 +465,7 @@ def export_entries(dest: str) -> None:
             _entry_to_markdown(row, related), encoding="utf-8"
         )
 
-    print(f"✓ Exported {len(rows)} entries to {dest_path}/")
+    print(f"Exported {len(rows)} entries to {dest_path}/")
 
 
 def status() -> None:
@@ -486,7 +486,7 @@ def status() -> None:
     conn.close()
 
     size_kb = db.stat().st_size // 1024
-    last_ts = last_row["timestamp"][:16] if last_row else "—"
+    last_ts = last_row["timestamp"][:16] if last_row else "n/a"
     print(f"Entries: {count}  |  Size: {size_kb} KB  |  Last saved: {last_ts}")
 
     tag_counts: dict[str, int] = {}
@@ -507,7 +507,7 @@ def status() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="memex — persistent session memory for Claude Code",
+        description="memex - persistent session memory for Claude Code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", metavar="command")

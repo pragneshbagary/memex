@@ -44,7 +44,7 @@ def test_install_no_hook_skips_stop_hook(install_env, capsys):
 
 def test_install_creates_claude_memex_md(install_env, capsys):
     cli.install()
-    memex_md = install_env / ".claude" / "memex.md"
+    memex_md = install_env / ".claude" / "CLAUDE.local.md"
     assert memex_md.exists()
     assert "memex" in memex_md.read_text()
 
@@ -57,9 +57,9 @@ def test_install_does_not_touch_project_claude_md(install_env, capsys):
 
 def test_install_idempotent_memex_md(install_env, capsys):
     cli.install()
-    first_content = (install_env / ".claude" / "memex.md").read_text()
+    first_content = (install_env / ".claude" / "CLAUDE.local.md").read_text()
     cli.install()
-    second_content = (install_env / ".claude" / "memex.md").read_text()
+    second_content = (install_env / ".claude" / "CLAUDE.local.md").read_text()
     assert first_content == second_content
 
 
@@ -71,7 +71,7 @@ def test_install_does_not_touch_gitignore(install_env, capsys):
 def test_install_adds_memex_md_to_git_exclude(install_env, capsys):
     cli.install()
     exclude = install_env / ".git" / "info" / "exclude"
-    assert ".claude/memex.md" in exclude.read_text().splitlines()
+    assert ".claude/CLAUDE.local.md" in exclude.read_text().splitlines()
 
 
 def test_install_git_exclude_idempotent(install_env, capsys):
@@ -106,7 +106,7 @@ def test_remove_cleans_stop_hook(install_env, capsys):
 
 def test_remove_deletes_memex_md(install_env, capsys):
     cli.install()
-    memex_md = install_env / ".claude" / "memex.md"
+    memex_md = install_env / ".claude" / "CLAUDE.local.md"
     assert memex_md.exists()
     cli.remove()
     assert not memex_md.exists()

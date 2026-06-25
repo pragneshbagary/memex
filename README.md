@@ -1,6 +1,6 @@
 # memex
 
-Every Claude Code session starts without knowing what you built last time — which files you changed, what decisions you made, what broke. You re-explain. Claude re-reads. You start over.
+Every Claude Code session starts without knowing what you built last time - which files you changed, what decisions you made, what broke. You re-explain. Claude re-reads. You start over.
 
 **memex keeps a structured log of every session. Claude reads it at the start of the next one.**
 
@@ -17,14 +17,14 @@ Restart Claude Code. That's it.
 
 ## What gets saved
 
-Each entry has structure — not a blob of text:
+Each entry has structure - not a blob of text:
 
 ```python
 mem_save(
     task="Replaced JWT auth with session cookies",
     files=["src/auth.py", "src/middleware.py"],
-    decisions=["Session cookies over JWT — simpler, no token refresh needed"],
-    warnings=["Redis required — app won't start without REDIS_URL set"],
+    decisions=["Session cookies over JWT - simpler, no token refresh needed"],
+    warnings=["Redis required - app won't start without REDIS_URL set"],
     tags=["auth", "sessions"]
 )
 ```
@@ -37,36 +37,39 @@ Claude calls `mem_save` when it finishes something meaningful. You can also just
 === memex: session context (db: my_project.db) ===
 
 --- Recent (2) ---
-[1] #4 — 2026-06-14T10:32
+[1] #4 - 2026-06-14T10:32
   Task      : Replaced JWT auth with session cookies
   Files     : src/auth.py, src/middleware.py
-  Decision  : Session cookies over JWT — simpler, no token refresh needed
-  Warning   : Redis required — app won't start without REDIS_URL set
+  Decision  : Session cookies over JWT - simpler, no token refresh needed
+  Warning   : Redis required - app won't start without REDIS_URL set
   Tags      : auth, sessions
 
-[2] #3 — 2026-06-13T15:10
+[2] #3 - 2026-06-13T15:10
   Task      : Added rate limiting to /api/login
   Files     : src/middleware.py
-  Warning   : Rate limiter is in-memory per process — resets on restart
+  Warning   : Rate limiter is in-memory per process - resets on restart
   Tags      : auth, rate-limiting
 ```
 
-Claude calls `mem_load` automatically at the start of every session. It returns the most recent entries plus any entries that match what you're working on — by keyword and by file path.
+Claude calls `mem_load` automatically at the start of every session. It returns the most recent entries plus any entries that match what you're working on - by keyword and by file path.
 
 ## Browse from the terminal
 
 You don't need to be inside Claude to look at your history:
 
 ```bash
-memex status                # entry count, DB size, top tags
-memex list                  # recent entries for this project
-memex list --tag auth       # filter by tag
-memex search "rate limit"   # full-text search
+memex status                     # entry count, DB size, top tags
+memex list                       # recent entries for this project
+memex list --tag auth            # filter by tag
+memex list --since 7d            # entries from the last 7 days
+memex list --since 2026-06-01 --until 2026-06-15  # date range
+memex search "rate limit"        # full-text search
+memex version                    # print installed version
 ```
 
 ## Export to markdown
 
-Turn your history into portable, human-browsable notes — one `.md` file per
+Turn your history into portable, human-browsable notes - one `.md` file per
 entry, with `[[wikilinks]]` connecting related entries and files, plus tags as
 `#hashtags`. Works in Obsidian or any tool that understands `[[links]]`:
 
@@ -81,7 +84,7 @@ section, so you can navigate your project history as a graph.
 
 | Tool | What it does |
 |------|--------------|
-| `mem_load` | Called at session start — returns recent + relevant entries |
+| `mem_load` | Called at session start - returns recent + relevant entries |
 | `mem_save` | Saves a structured entry after meaningful work |
 | `mem_update` | Patches specific fields of an existing entry (keeps id and timestamp) |
 | `mem_search` | Full-text search across all entries |
@@ -90,11 +93,11 @@ section, so you can navigate your project history as a graph.
 
 ## Why not just CLAUDE.md?
 
-`CLAUDE.md` is for static project documentation — architecture, conventions, how to run tests. It doesn't change much and it isn't session-aware.
+`CLAUDE.md` is for static project documentation - architecture, conventions, how to run tests. It doesn't change much and it isn't session-aware.
 
 memex captures what's changing session to session: what you built yesterday, the decision you made this morning, the warning you discovered an hour ago. It's the difference between *"here's the project"* and *"here's what happened last time."*
 
-`memex install` writes Claude's instructions into `.claude/memex.md` — a file Claude Code loads automatically without touching your project's own `CLAUDE.md`.
+`memex install` writes Claude's instructions into `.claude/CLAUDE.local.md` - a file Claude Code loads automatically without touching your project's own `CLAUDE.md`.
 
 ## Memory is scoped per project
 
@@ -118,7 +121,7 @@ memex remove
 pip uninstall mcp-memex
 ```
 
-Memory DBs are kept at `~/.memex/` — delete that directory manually if you want to wipe everything.
+Memory DBs are kept at `~/.memex/` - delete that directory manually if you want to wipe everything.
 
 ## Requirements
 
@@ -130,3 +133,5 @@ Memory DBs are kept at `~/.memex/` — delete that directory manually if you wan
 ## License
 
 MIT
+
+<!-- mcp-name: memex -->

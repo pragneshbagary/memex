@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-memex"
-version = "0.1.8"
+version = "0.1.9"
 description = "Persistent session memory for Claude Code — local SQLite, no LLMs, no network"
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,3 +23,4 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 memex = "memex.cli:main"
+mcp-memex = "memex.cli:main"

@@ -4,11 +4,15 @@ Every Claude Code session starts without knowing what you built last time - whic
 
 **memex keeps a structured log of every session. Claude reads it at the start of the next one.**
 
-No cloud. No LLM extraction. No cost per save. Just local SQLite and two commands to install.
+No cloud. No LLM extraction. No cost per save. Just local SQLite and one command to install.
 
 ## Install
 
 ```bash
+# with uv
+uvx mcp-memex install
+
+# with pip
 pip install mcp-memex
 memex install
 ```

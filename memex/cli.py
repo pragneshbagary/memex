@@ -510,6 +510,7 @@ def main() -> None:
         description="memex - persistent session memory for Claude Code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    parser.add_argument("--version", action="version", version=f"memex {__version__}")
     subparsers = parser.add_subparsers(dest="command", metavar="command")
 
     install_parser = subparsers.add_parser("install", help="Install memex into Claude Code")

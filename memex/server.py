@@ -251,7 +251,7 @@ def mem_load(
 
         # 2. FTS keyword search on hint
         if hint and hint.strip():
-            safe_hint = re.sub(r'[^a-zA-Z0-9 _\-]', ' ', hint).strip()
+            safe_hint = re.sub(r'[^a-zA-Z0-9 _]', ' ', hint).strip()
             if safe_hint:
                 fts_rows = conn.execute(
                     """SELECT e.* FROM entries e

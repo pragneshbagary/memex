@@ -89,6 +89,14 @@ def test_mem_load_no_duplicate_in_recent_and_matched(mem_db):
     assert result.count("zqzqzq") == 1
 
 
+def test_mem_load_hyphenated_hint_does_not_crash(mem_db):
+    # Hyphens are FTS5 NOT operators; passing them raw causes OperationalError.
+    srv.mem_save(task="Implemented rate limiting on the API")
+    for hint in ["rate-limit", "two-factor", "set-up"]:
+        result = srv.mem_load(hint=hint)
+        assert isinstance(result, str)
+
+
 # ---------------------------------------------------------------------------
 # mem_search
 # ---------------------------------------------------------------------------

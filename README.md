@@ -134,4 +134,4 @@ Memory DBs are kept at `~/.memex/` - delete that directory manually if you want 
 
 MIT
 
-<!-- mcp-name: memex -->
+<!-- mcp-name: io.github.pragneshbagary/memex -->
